@@ -11,7 +11,9 @@ Description: Read ODS (OpenDocument Spreadsheet) and puts them into data frames.
 Imports:
     xml2,
     cellranger,
-    readr
+    readr,
+    RSQLite,
+    DBI
 Suggests:
     dplyr,
     testthat

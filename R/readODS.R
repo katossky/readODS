@@ -3,6 +3,8 @@
 #' @import xml2
 #' @import cellranger
 #' @import readr
+#' @import RSQLite
+#' @import DBI
 NULL
 
 
@@ -135,7 +137,10 @@ parse_rows <- function(parsed_sheet, ods_ns, formula_as_formula, skip = 0) {
     if (skip > 0) {
         rows <- rows[(skip+1):length(rows)]
     }
-    cell_values <- data.frame()
+    ##cell_values <- data.frame()
+    sqlite <- dbDriver("SQLite")
+    con <- dbConnect(sqlite,":memory:")
+    z <- dbSendQuery(con, "create table cell_values(row_id integer, col_id integer, cell_value text)")
     current_row <- 0
     for (row in rows) {
         current_row <- current_row + 1
@@ -152,7 +157,8 @@ parse_rows <- function(parsed_sheet, ods_ns, formula_as_formula, skip = 0) {
                 if (cell_with_textp) {
                     ## non_empty cell, get the value
                     cell_value <- parse_single_cell(cell, ods_ns, formula_as_formula = formula_as_formula)
-                    cell_values <- rbind(cell_values, data.frame(row_id = current_row, col_id = current_col, cell_value = cell_value, stringsAsFactors = FALSE))
+                    ## cell_values <- rbind(cell_values, data.frame(row_id = current_row, col_id = current_col, cell_value = cell_value, stringsAsFactors = FALSE))
+                    z <- dbSendQuery(con, paste0("insert into cell_values (row_id, col_id, cell_value) values (",current_row,",", current_col, ",'", cell_value, "')"))
                 }
                 if (bump_cell > 1 & !cell_with_textp) {
                     current_col <- current_col + bump_cell - 1
@@ -160,14 +166,17 @@ parse_rows <- function(parsed_sheet, ods_ns, formula_as_formula, skip = 0) {
                 if (bump_cell > 1 & cell_with_textp) {
                     for (bump in 1:(bump_cell-1)) {
                         current_col <- current_col + 1
-                        cell_values <- rbind(cell_values, data.frame(row_id = current_row, col_id = current_col, cell_value = cell_value ,stringsAsFactors = FALSE))
+                        ##cell_values <- rbind(cell_values, data.frame(row_id = current_row, col_id = current_col, cell_value = cell_value ,stringsAsFactors = FALSE))
+                        z <- dbSendQuery(con, paste0("insert into cell_values (row_id, col_id, cell_value) values (",current_row,",", current_col, ",'", cell_value, "')"))
                     }
                 }
             }
         }
     }
-    return(cell_values)
-
+    allrows <- dbSendQuery(con, "select * from cell_values")
+    res <- fetch(allrows)
+    dbDisconnect(con)
+    return(res)
 }
 
 
